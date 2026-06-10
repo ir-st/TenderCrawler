@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+output/*
+!output/.gitkeep
+_detail.html
+*.code-workspace
+jiaoyigongkai.js
+des.js
+_probe*.py
+api_sample.json
+.DS_Store
+Thumbs.db

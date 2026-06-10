@@ -1,0 +1,20 @@
+{
+  "name": "tender-crawler-daily-noon",
+  "description": "每天北京时间 12:00 抓取 cebpub + ccgp 招投标公告并对比上次结果",
+  "enabled": true,
+  "schedule": {
+    "kind": "cron",
+    "expr": "0 12 * * *",
+    "tz": "Asia/Shanghai"
+  },
+  "sessionTarget": "isolated",
+  "wakeMode": "now",
+  "payload": {
+    "kind": "agentTurn",
+    "message": "【TenderCrawler 定时任务】请执行每日招投标抓取：\n\n1. 确认环境变量 TENDER_CRAWLER_HOME 指向 TenderCrawler 项目根目录。\n2. 运行技能脚本：python {baseDir}/scripts/run_daily_crawl.py\n   或在项目根执行：python scheduled_crawl.py --max-pages 3 --json-summary\n3. 解析输出中 __TENDER_CRAWLER_SUMMARY__= 后的 JSON。\n4. 用中文汇报：各站点抓取条数、对比新增/消失数量、输出文件路径；若有失败说明原因。\n5. 不要启动 Web 服务 app.py，仅命令行定时抓取即可。"
+  },
+  "delivery": {
+    "mode": "announce",
+    "bestEffort": true
+  }
+}

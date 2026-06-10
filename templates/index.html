@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TenderCrawler — 招投标抓取控制台</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --surface2: #243044;
+      --border: #2d3f56;
+      --text: #e7edf5;
+      --muted: #8ba3be;
+      --accent: #3b82f6;
+      --accent-hover: #2563eb;
+      --success: #22c55e;
+      --error: #ef4444;
+      --radius: 10px;
+      --font: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .layout {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 2rem 1.25rem 4rem;
+    }
+    header {
+      margin-bottom: 2rem;
+    }
+    header h1 {
+      font-size: 1.6rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+    header p {
+      color: var(--muted);
+      margin-top: 0.35rem;
+      font-size: 0.95rem;
+    }
+    section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.25rem;
+    }
+    section h2 {
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+      margin-bottom: 1rem;
+      font-weight: 600;
+    }
+    .sites {
+      display: grid;
+      gap: 0.75rem;
+    }
+    .site-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.75rem;
+      padding: 1rem 1.1rem;
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .site-card:hover { background: var(--surface2); }
+    .site-card.selected {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.08);
+    }
+    .site-card input { margin-top: 0.2rem; accent-color: var(--accent); }
+    .site-card .meta strong { display: block; font-size: 1rem; }
+    .site-card .meta span { font-size: 0.85rem; color: var(--muted); }
+    .site-card .meta a { color: var(--accent); font-size: 0.8rem; }
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.4rem 0.75rem;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      user-select: none;
+    }
+    .chip:has(input:checked) {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.15);
+    }
+    .chip input { accent-color: var(--accent); }
+    label.field {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 0.35rem;
+    }
+    textarea, input[type="text"], input[type="date"], input[type="number"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: inherit;
+      font-size: 0.9rem;
+    }
+    textarea { min-height: 72px; resize: vertical; }
+    .row2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 600px) { .row2 { grid-template-columns: 1fr; } }
+    .options {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      align-items: center;
+      font-size: 0.9rem;
+    }
+    .options label { display: flex; align-items: center; gap: 0.4rem; cursor: pointer; }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 0.65rem 1.4rem;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn-primary {
+      background: var(--accent);
+      color: #fff;
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--accent-hover); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-ghost {
+      background: transparent;
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+    .actions { display: flex; gap: 0.75rem; flex-wrap: wrap; margin-top: 0.5rem; }
+    .chip-toolbar {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.65rem;
+      flex-wrap: wrap;
+    }
+    .chip-toolbar .btn-sm {
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8rem;
+      font-weight: 500;
+    }
+    .status-bar {
+      padding: 0.75rem 1rem;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+      display: none;
+    }
+    .status-bar.running { display: block; background: rgba(59, 130, 246, 0.12); border: 1px solid var(--accent); }
+    .status-bar.done { display: block; background: rgba(34, 197, 94, 0.12); border: 1px solid var(--success); }
+    .status-bar.error { display: block; background: rgba(239, 68, 68, 0.12); border: 1px solid var(--error); }
+    .progress-log {
+      max-height: 120px;
+      overflow-y: auto;
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 0.5rem;
+      font-family: ui-monospace, monospace;
+    }
+    .table-wrap {
+      overflow-x: auto;
+      margin-top: 1rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.85rem;
+    }
+    th, td {
+      padding: 0.6rem 0.75rem;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    th { background: var(--surface2); color: var(--muted); font-weight: 600; white-space: nowrap; }
+    tr:hover td { background: rgba(255,255,255,0.02); }
+    td.title { max-width: 320px; }
+    td.title a { color: var(--accent); text-decoration: none; }
+    td.title a:hover { text-decoration: underline; }
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.45rem;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      background: var(--surface2);
+      margin-right: 0.25rem;
+    }
+    .empty-hint { color: var(--muted); font-size: 0.9rem; padding: 1rem 0; }
+    #resultsSection { display: none; }
+    #resultsSection.visible { display: block; }
+    #compareSection { display: none; margin-top: 1.25rem; }
+    #compareSection.visible { display: block; }
+    .compare-summary {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 0.75rem;
+      line-height: 1.6;
+    }
+    .compare-stat {
+      display: inline-block;
+      margin-right: 1rem;
+      font-weight: 600;
+    }
+    .compare-stat.added { color: var(--success); }
+    .compare-stat.removed { color: var(--error); }
+    .compare-stat.same { color: var(--muted); }
+    .compare-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .compare-tabs button {
+      padding: 0.35rem 0.85rem;
+      font-size: 0.8rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .compare-tabs button.active {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.15);
+    }
+    .result-tabs {
+      display: flex;
+      gap: 0.5rem;
+      margin: 0.75rem 0 1rem;
+      flex-wrap: wrap;
+    }
+    .result-tabs button {
+      padding: 0.45rem 1rem;
+      font-size: 0.85rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      font-family: inherit;
+      font-weight: 500;
+    }
+    .result-tabs button.active {
+      border-color: var(--accent);
+      background: rgba(59, 130, 246, 0.15);
+      color: #fff;
+    }
+    .result-panel { display: none; }
+    .result-panel.active { display: block; }
+    .bulletin-hint { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.75rem; }
+    .status-ok { color: var(--success); }
+    .status-fail { color: var(--error); }
+    .status-empty { color: #f59e0b; }
+  </style>
+</head>
+<body>
+  <div class="layout">
+    <header>
+      <h1>TenderCrawler</h1>
+      <p>支持 cebpub / ccgp 两站抓取、结果对比与招标时间解析</p>
+    </header>
+
+    <form id="crawlForm">
+      <section>
+        <h2>目标网站</h2>
+        <div class="sites" id="siteList"></div>
+        <p id="siteHint" class="empty-hint" style="display:none;margin-top:0.75rem;color:#f59e0b"></p>
+      </section>
+
+      <section>
+        <h2>关键词</h2>
+        <p class="empty-hint" style="padding-top:0">勾选推荐词，或在下方每行输入一个自定义关键词</p>
+        <div class="chips" id="keywordChips"></div>
+        <label class="field" for="customKeywords">自定义关键词（每行一个）</label>
+        <textarea id="customKeywords" placeholder="例如：&#10;渗透测试&#10;代码审计&#10;漏洞扫描"></textarea>
+      </section>
+
+      <section>
+        <h2>业务类型</h2>
+        <div class="chip-toolbar">
+          <button type="button" class="btn btn-ghost btn-sm" id="typeSelectAll">全选</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="typeClearAll">取消全选</button>
+        </div>
+        <div class="chips" id="typeChips"></div>
+      </section>
+
+      <section>
+        <h2>高级选项</h2>
+        <div class="row2" style="margin-bottom:1rem">
+          <div>
+            <label class="field" for="dateStart">开始日期</label>
+            <input type="date" id="dateStart" />
+          </div>
+          <div>
+            <label class="field" for="dateStop">结束日期</label>
+            <input type="date" id="dateStop" />
+          </div>
+        </div>
+        <div class="options">
+          <label><input type="checkbox" id="strictFilter" checked /> 标题二次过滤（仅保留安全/密评相关）</label>
+          <label>每组合最多页数 <input type="number" id="maxPages" min="1" placeholder="不限" style="width:5rem" /></label>
+          <label>请求间隔(秒) <input type="number" id="delay" value="0.8" min="0.3" step="0.1" style="width:4rem" /></label>
+        </div>
+        <div class="actions">
+          <button type="submit" class="btn btn-primary" id="startBtn">开始抓取</button>
+          <button type="button" class="btn btn-ghost" id="resetBtn">重置表单</button>
+        </div>
+      </section>
+    </form>
+
+    <div id="statusBar" class="status-bar"></div>
+
+    <section id="resultsSection">
+      <h2>抓取结果</h2>
+      <div id="statsLine" class="empty-hint"></div>
+      <div class="actions" id="downloadActions" style="display:none">
+        <a class="btn btn-ghost" id="dlCsv" href="#">下载 CSV</a>
+        <a class="btn btn-ghost" id="dlJson" href="#">下载 JSON</a>
+        <a class="btn btn-ghost" id="dlCompare" href="#" style="display:none">下载对比报告</a>
+        <a class="btn btn-ghost" id="dlBulletin" href="#" style="display:none">下载招标时间</a>
+      </div>
+      <div class="result-tabs" id="resultTabs">
+        <button type="button" class="active" data-panel="list">全部结果</button>
+        <button type="button" data-panel="compare">对比分析</button>
+        <button type="button" data-panel="bulletin">招标时间</button>
+      </div>
+      <div class="result-panel active" id="panelList">
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>分类</th>
+                <th>类型</th>
+                <th>地区</th>
+                <th>平台</th>
+                <th>公告发布时间</th>
+                <th>公告结束时间</th>
+              </tr>
+            </thead>
+            <tbody id="resultBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="result-panel" id="panelCompare">
+        <div id="compareSummary" class="compare-summary"></div>
+        <div class="compare-tabs" id="compareTabs" style="display:none">
+          <button type="button" class="active" data-tab="added">新增</button>
+          <button type="button" data-tab="removed">消失</button>
+        </div>
+        <div class="table-wrap" id="compareTableWrap" style="display:none">
+          <table>
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>分类</th>
+                <th>类型</th>
+                <th>地区</th>
+                <th>公告发布时间</th>
+                <th>公告结束时间</th>
+              </tr>
+            </thead>
+            <tbody id="compareBody"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="result-panel" id="panelBulletin">
+        <div id="bulletinHint" class="bulletin-hint">抓取完成后将自动解析招标公告正文，提取招标文件获取时间与投标截止时间。</div>
+        <div class="actions" style="margin-bottom:0.75rem">
+          <button type="button" class="btn btn-ghost btn-sm" id="refetchBulletinBtn" style="display:none">重新抓取招标时间</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>标题</th>
+                <th>类型</th>
+                <th>招标文件获取时间</th>
+                <th>投标时间</th>
+                <th>状态</th>
+              </tr>
+            </thead>
+            <tbody id="bulletinBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    let sites = [];
+    let selectedSiteId = null;
+    let pollTimer = null;
+    let currentJobId = null;
+    let compareCache = { added: [], removed: [] };
+    let compareTab = "added";
+    let resultTab = "list";
+    let bulletinPollTimer = null;
+
+    const KEYWORD_PRESETS = {{ suggested_keywords | tojson }};
+    const DEFAULT_KEYWORDS = {{ default_keywords | tojson }};
+
+    async function loadSites() {
+      const res = await fetch("/api/sites?_=" + Date.now(), { cache: "no-store" });
+      const data = await res.json();
+      sites = data.sites || [];
+      renderSites();
+      if (sites.length) selectSite(sites[0].id);
+    }
+
+    function renderSites() {
+      const el = document.getElementById("siteList");
+      el.innerHTML = sites.map(s => `
+        <label class="site-card ${s.id === selectedSiteId ? "selected" : ""}" data-id="${s.id}">
+          <input type="radio" name="site" value="${s.id}" ${s.id === selectedSiteId ? "checked" : ""} />
+          <div class="meta">
+            <strong>${escapeHtml(s.name)}</strong>
+            <span>${escapeHtml(s.description)}</span>
+            <a href="${escapeHtml(s.portal_url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">打开门户 ↗</a>
+          </div>
+        </label>
+      `).join("");
+      el.querySelectorAll(".site-card").forEach(card => {
+        card.addEventListener("click", () => selectSite(card.dataset.id));
+      });
+    }
+
+    function selectSite(id) {
+      selectedSiteId = id;
+      const site = sites.find(s => s.id === id);
+      if (!site) return;
+      renderSites();
+      renderKeywordChips(site);
+      renderTypeChips(site);
+      if (site.default_delay) {
+        document.getElementById("delay").value = site.default_delay;
+      }
+      const hint = document.getElementById("siteHint");
+      if (site.id === "ccgp") {
+        hint.textContent = "中国政府采购网响应较慢且易限流，建议请求间隔 ≥4 秒、少选关键词；单次抓取可加「最多页数」限制。标题链接直达公告详情；「招标时间」标签可解析文件获取与投标截止时间。";
+        document.getElementById("delay").value = Math.max(site.default_delay || 3, 4);
+        hint.style.display = "block";
+      } else if (site.id === "cebpub") {
+        hint.textContent = "招标投标公共服务平台 JSON 接口，默认间隔 0.8 秒。详情经加密中转页打开；「招标时间」标签通过 findDetail.do 解析文件获取与投标截止时间。";
+        hint.style.display = "block";
+      } else {
+        hint.style.display = "none";
+      }
+    }
+
+    function renderKeywordChips(site) {
+      const el = document.getElementById("keywordChips");
+      const fromApi = site.suggested_keywords || site.default_keywords || [];
+      const suggested = [...new Set([...fromApi, ...KEYWORD_PRESETS])];
+      el.innerHTML = suggested.map(kw => `
+        <label class="chip">
+          <input type="checkbox" name="kw" value="${escapeAttr(kw)}"
+            ${(site.default_keywords || DEFAULT_KEYWORDS).includes(kw) ? "checked" : ""} />
+          ${escapeHtml(kw)}
+        </label>
+      `).join("");
+    }
+
+    function setAllTypeChecked(checked) {
+      document.querySelectorAll("#typeChips input[name=bt]").forEach((el) => {
+        el.checked = checked;
+      });
+    }
+
+    function renderTypeChips(site) {
+      const types = site.business_types || [];
+      const el = document.getElementById("typeChips");
+      el.innerHTML = types.map((t) => `
+        <label class="chip">
+          <input type="checkbox" name="bt" value="${escapeAttr(t)}" checked />
+          ${escapeHtml(t)}
+        </label>
+      `).join("");
+    }
+
+    document.getElementById("typeSelectAll").addEventListener("click", () => {
+      setAllTypeChecked(true);
+    });
+    document.getElementById("typeClearAll").addEventListener("click", () => {
+      setAllTypeChecked(false);
+    });
+
+    function collectKeywords() {
+      const fromChips = [...document.querySelectorAll('#keywordChips input:checked')].map(i => i.value);
+      const custom = document.getElementById("customKeywords").value
+        .split(/\n/)
+        .map(s => s.trim())
+        .filter(Boolean);
+      return [...new Set([...fromChips, ...custom])];
+    }
+
+    function collectTypes() {
+      return [...document.querySelectorAll('#typeChips input:checked')].map(i => i.value);
+    }
+
+    function setStatus(kind, message, progress = []) {
+      const bar = document.getElementById("statusBar");
+      bar.className = "status-bar " + kind;
+      const log = progress.length
+        ? `<div class="progress-log">${progress.map(escapeHtml).join("<br>")}</div>`
+        : "";
+      bar.innerHTML = `<div>${escapeHtml(message)}</div>${log}`;
+    }
+
+    function escapeHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+    function escapeAttr(s) { return escapeHtml(s).replace(/'/g, "&#39;"); }
+
+    document.getElementById("crawlForm").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const keywords = collectKeywords();
+      const business_types = collectTypes();
+      if (!selectedSiteId) { alert("请选择目标网站"); return; }
+      if (!keywords.length) { alert("请至少选择一个或输入一个关键词"); return; }
+      const site = sites.find(s => s.id === selectedSiteId);
+      const allowedTypes = new Set(site?.business_types || []);
+      const validTypes = business_types.filter(t => allowedTypes.has(t));
+      if (!validTypes.length) {
+        alert(`当前站点「${site?.name || ""}」不支持已选业务类型。\n请重新选择目标网站后再勾选业务类型。\n可选：${[...allowedTypes].join("、")}`);
+        return;
+      }
+      if (validTypes.length < business_types.length) {
+        console.warn("已忽略与当前站点不匹配的业务类型");
+      }
+
+      const maxPagesVal = document.getElementById("maxPages").value;
+      const delayInput = parseFloat(document.getElementById("delay").value);
+      const payload = {
+        site_id: selectedSiteId,
+        keywords,
+        business_types: validTypes,
+        strict_filter: document.getElementById("strictFilter").checked,
+        date_start: document.getElementById("dateStart").value,
+        date_stop: document.getElementById("dateStop").value,
+        delay: delayInput > 0 ? delayInput : (site?.default_delay || 0.8),
+        max_pages: maxPagesVal ? parseInt(maxPagesVal, 10) : null,
+      };
+
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("resultsSection").classList.remove("visible");
+      setStatus("running", "正在提交任务…");
+
+      try {
+        const res = await fetch("/api/crawl", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const raw = await res.text();
+        let data;
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          throw new Error("服务返回异常，请重启 start.bat 后重试");
+        }
+        if (!res.ok) throw new Error(data.error || "提交失败");
+        currentJobId = data.job_id;
+        pollJob();
+      } catch (err) {
+        setStatus("error", err.message);
+        document.getElementById("startBtn").disabled = false;
+      }
+    });
+
+    function pollJob() {
+      if (pollTimer) clearInterval(pollTimer);
+      pollTimer = setInterval(async () => {
+        if (!currentJobId) return;
+        const res = await fetch(`/api/jobs/${currentJobId}`);
+        const raw = await res.text();
+        let job;
+        try {
+          job = JSON.parse(raw);
+        } catch {
+          setStatus("error", "无法读取任务状态，请刷新页面");
+          clearInterval(pollTimer);
+          pollTimer = null;
+          document.getElementById("startBtn").disabled = false;
+          return;
+        }
+        if (job.status === "running") {
+          setStatus("running", job.message || "抓取中…", job.progress || []);
+        } else {
+          clearInterval(pollTimer);
+          pollTimer = null;
+          document.getElementById("startBtn").disabled = false;
+          if (job.status === "error") {
+            setStatus("error", job.error || "未知错误", job.progress);
+            return;
+          }
+          setStatus("done", job.message, job.progress);
+          showResults(job);
+        }
+      }, 1200);
+    }
+
+    function basename(path) {
+      if (!path) return "";
+      const parts = String(path).replace(/\\/g, "/").split("/");
+      return parts[parts.length - 1] || path;
+    }
+
+    function renderCompareTable(rows) {
+      const tbody = document.getElementById("compareBody");
+      const slice = (rows || []).slice(0, 100);
+      tbody.innerHTML = slice.map((r) => `
+        <tr>
+          <td class="title">${escapeHtml(r.title || "—")}</td>
+          <td>${(r.categories || []).map(c => `<span class="badge">${escapeHtml(c)}</span>`).join("")}</td>
+          <td>${escapeHtml(r.business_type || "—")}</td>
+          <td>${escapeHtml(r.region || "—")}</td>
+          <td>${escapeHtml(r.publish_time || "—")}</td>
+          <td>${escapeHtml(r.end_time || "—")}</td>
+        </tr>
+      `).join("");
+      if ((rows || []).length > 100) {
+        tbody.innerHTML += `<tr><td colspan="6" style="color:var(--muted)">仅展示前 100 条，请下载对比报告查看全部</td></tr>`;
+      }
+    }
+
+    function switchResultTab(panel) {
+      resultTab = panel;
+      document.querySelectorAll("#resultTabs button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.panel === panel);
+      });
+      document.querySelectorAll(".result-panel").forEach((el) => {
+        el.classList.toggle("active", el.id === `panel${panel.charAt(0).toUpperCase()}${panel.slice(1)}`);
+      });
+    }
+
+    document.getElementById("resultTabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-panel]");
+      if (!btn) return;
+      switchResultTab(btn.dataset.panel);
+    });
+
+    function bulletinStatusLabel(status) {
+      if (status === "ok") return '<span class="status-ok">已解析</span>';
+      if (status === "failed") return '<span class="status-fail">失败</span>';
+      if (status === "empty") return '<span class="status-empty">未识别</span>';
+      return escapeHtml(status || "—");
+    }
+
+    function renderBulletinTable(job) {
+      const rows = job.bulletin_details || [];
+      const hint = document.getElementById("bulletinHint");
+      const tbody = document.getElementById("bulletinBody");
+      const dl = document.getElementById("dlBulletin");
+      const refetch = document.getElementById("refetchBulletinBtn");
+
+      if (job.bulletin_status === "running") {
+        hint.textContent = job.bulletin_message || "正在抓取招标公告详情…";
+        refetch.style.display = "none";
+      } else if (job.bulletin_status === "error") {
+        hint.textContent = job.bulletin_error || job.bulletin_message || "抓取失败";
+        refetch.style.display = "inline-flex";
+      } else if (rows.length) {
+        hint.textContent = job.bulletin_message || `共 ${rows.length} 条招标类公告`;
+        refetch.style.display = "inline-flex";
+      } else if (job.bulletin_status === "done") {
+        hint.textContent = "本次结果中无招标类公告，或未解析到时间字段。";
+        refetch.style.display = "inline-flex";
+      }
+
+      if (job.has_bulletin && currentJobId) {
+        dl.style.display = "inline-flex";
+        dl.href = `/api/download/${currentJobId}/bulletin`;
+      } else {
+        dl.style.display = "none";
+      }
+
+      tbody.innerHTML = rows.slice(0, 200).map((r) => `
+        <tr>
+          <td class="title" title="${escapeAttr(r.title || "")}">${escapeHtml(r.title || "—")}</td>
+          <td>${escapeHtml(r.business_type || "—")}</td>
+          <td>${escapeHtml(r.doc_get_time || "—")}</td>
+          <td>${escapeHtml(r.bid_submit_time || "—")}</td>
+          <td>${bulletinStatusLabel(r.status)}${r.error ? `<div style="color:var(--muted);font-size:0.75rem">${escapeHtml(r.error)}</div>` : ""}</td>
+        </tr>
+      `).join("");
+      if (rows.length > 200) {
+        tbody.innerHTML += `<tr><td colspan="5" style="color:var(--muted)">仅展示前 200 条</td></tr>`;
+      }
+      if (!rows.length && job.bulletin_status === "running") {
+        tbody.innerHTML = `<tr><td colspan="5" style="color:var(--muted)">请稍候…</td></tr>`;
+      }
+    }
+
+    async function refetchBulletinDetails() {
+      if (!currentJobId) return;
+      document.getElementById("refetchBulletinBtn").disabled = true;
+      try {
+        await fetch(`/api/jobs/${currentJobId}/bulletin-details`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ delay: parseFloat(document.getElementById("delay").value) || 0.6 }),
+        });
+        pollBulletinJob();
+      } finally {
+        document.getElementById("refetchBulletinBtn").disabled = false;
+      }
+    }
+
+    document.getElementById("refetchBulletinBtn").addEventListener("click", refetchBulletinDetails);
+
+    function pollBulletinJob() {
+      if (bulletinPollTimer) clearInterval(bulletinPollTimer);
+      bulletinPollTimer = setInterval(async () => {
+        if (!currentJobId) return;
+        const res = await fetch(`/api/jobs/${currentJobId}`);
+        const job = await res.json();
+        renderBulletinTable(job);
+        if (job.bulletin_status !== "running") {
+          clearInterval(bulletinPollTimer);
+          bulletinPollTimer = null;
+        }
+      }, 1500);
+    }
+
+    function showCompare(job) {
+      const cmp = job.compare || {};
+      const detail = job.compare_detail || {};
+      compareCache = {
+        added: detail.added || [],
+        removed: detail.removed || [],
+      };
+
+      const summary = document.getElementById("compareSummary");
+      const tabs = document.getElementById("compareTabs");
+      const tableWrap = document.getElementById("compareTableWrap");
+      const dlCompare = document.getElementById("dlCompare");
+
+      if (job.has_compare) {
+        dlCompare.style.display = "inline-flex";
+        dlCompare.href = `/api/download/${currentJobId}/compare`;
+      } else {
+        dlCompare.style.display = "none";
+      }
+
+      if (!cmp.has_previous) {
+        summary.textContent = `本次共 ${cmp.current_total || job.stats?.total || 0} 条，暂无同站点历史快照，下次抓取后将自动对比。`;
+        tabs.style.display = "none";
+        tableWrap.style.display = "none";
+        return;
+      }
+
+      const prevName = basename(cmp.previous_path);
+      summary.innerHTML = `
+        对比基准：<code>${escapeHtml(prevName)}</code>（${cmp.previous_total} 条）
+        → 本次（${cmp.current_total} 条）<br>
+        <span class="compare-stat added">新增 ${cmp.added_count || 0}</span>
+        <span class="compare-stat removed">消失 ${cmp.removed_count || 0}</span>
+        <span class="compare-stat same">未变 ${cmp.unchanged_count || 0}</span>
+      `;
+
+      const hasDiff = compareCache.added.length || compareCache.removed.length;
+      if (!hasDiff) {
+        tabs.style.display = "none";
+        tableWrap.style.display = "none";
+        summary.innerHTML += `<br>与上次结果完全一致。`;
+        return;
+      }
+
+      tabs.style.display = "flex";
+      tableWrap.style.display = "block";
+      compareTab = compareCache.added.length ? "added" : "removed";
+      tabs.querySelectorAll("button").forEach((btn) => {
+        btn.classList.toggle("active", btn.dataset.tab === compareTab);
+        btn.style.display =
+          (btn.dataset.tab === "added" && compareCache.added.length) ||
+          (btn.dataset.tab === "removed" && compareCache.removed.length)
+            ? "inline-block"
+            : "none";
+      });
+      renderCompareTable(compareTab === "added" ? compareCache.added : compareCache.removed);
+    }
+
+    document.getElementById("compareTabs").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-tab]");
+      if (!btn) return;
+      compareTab = btn.dataset.tab;
+      document.querySelectorAll("#compareTabs button").forEach((b) => {
+        b.classList.toggle("active", b === btn);
+      });
+      renderCompareTable(compareTab === "added" ? compareCache.added : compareCache.removed);
+    });
+
+    function showResults(job) {
+      const sec = document.getElementById("resultsSection");
+      sec.classList.add("visible");
+      const stats = job.stats || {};
+      const byCat = stats.by_category || {};
+      const catLine = Object.entries(byCat).map(([k, v]) => `${k}: ${v}`).join(" · ");
+      document.getElementById("statsLine").textContent =
+        `共 ${stats.total || 0} 条` + (catLine ? `（${catLine}）` : "");
+
+      const dl = document.getElementById("downloadActions");
+      dl.style.display = "flex";
+      document.getElementById("dlCsv").href = `/api/download/${currentJobId}/csv`;
+      document.getElementById("dlJson").href = `/api/download/${currentJobId}/json`;
+      showCompare(job);
+      renderBulletinTable(job);
+      if (job.bulletin_status === "running" || job.bulletin_status === "idle") {
+        pollBulletinJob();
+      }
+
+      const tbody = document.getElementById("resultBody");
+      const rows = (job.records || []).slice(0, 200);
+      tbody.innerHTML = rows.map((r, i) => `
+        <tr>
+          <td class="title">
+            <a href="/detail/open?job_id=${escapeAttr(currentJobId)}&index=${i}" target="_blank" rel="noopener" title="${escapeAttr(r.title)}">
+              ${escapeHtml(r.title)}
+            </a>
+          </td>
+          <td>${(r.categories || []).map(c => `<span class="badge">${escapeHtml(c)}</span>`).join("")}</td>
+          <td>${escapeHtml(r.business_type)}</td>
+          <td>${escapeHtml(r.region || "—")}</td>
+          <td>${escapeHtml(r.platform || "—")}</td>
+          <td>${escapeHtml(r.publish_time || "—")}</td>
+          <td>${escapeHtml(r.end_time || "—")}</td>
+        </tr>
+      `).join("");
+      if ((job.records || []).length > 200) {
+        tbody.innerHTML += `<tr><td colspan="7" style="color:var(--muted)">仅展示前 200 条，请下载文件查看全部</td></tr>`;
+      }
+    }
+
+    document.getElementById("resetBtn").addEventListener("click", () => {
+      if (sites.length) selectSite(sites[0].id);
+      document.getElementById("customKeywords").value = "";
+      document.getElementById("dateStart").value = "";
+      document.getElementById("dateStop").value = "";
+      document.getElementById("strictFilter").checked = true;
+      document.getElementById("maxPages").value = "";
+      document.getElementById("delay").value = "0.8";
+      document.getElementById("statusBar").className = "status-bar";
+      document.getElementById("resultsSection").classList.remove("visible");
+      if (bulletinPollTimer) clearInterval(bulletinPollTimer);
+      bulletinPollTimer = null;
+      switchResultTab("list");
+    });
+
+    loadSites();
+  </script>
+</body>
+</html>

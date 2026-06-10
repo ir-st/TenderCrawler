@@ -1,0 +1,15 @@
+{
+  "skills": {
+    "entries": {
+      "tender-crawler": {
+        "enabled": true,
+        "env": {
+          "TENDER_CRAWLER_HOME": "C:/Users/me/TenderCrawler",
+          "TENDER_CRAWLER_OUTPUT": "C:/Users/me/TenderCrawler/output",
+          "TENDER_CRAWLER_SITES": "cebpub,ccgp",
+          "TENDER_CRAWLER_MAX_PAGES": "3"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <title>正在打开详情…</title>
+  <style>
+    body {
+      font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      background: #0f1419;
+      color: #8ba3be;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .box { text-align: center; }
+    a { color: #3b82f6; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <p id="msg">正在跳转到公示详情页，请稍候…</p>
+    <p id="fallback" style="display:none">
+      若未自动打开，请
+      <a id="manual" href="#">点击此处</a>
+      或返回
+      <a href="/">控制台</a>。
+    </p>
+  </div>
+
+  {% if rec.list_type == '1' and rec.row_guid %}
+  <script>
+    (function () {
+      var url = {{ (frame_detail_base ~ rec.row_guid)|tojson }};
+      window.location.replace(url);
+    })();
+  </script>
+  {% else %}
+  <form id="detailForm" method="post" action="{{ detail_action }}" target="_blank" style="display:none">
+    <input type="hidden" name="schemaVersion" id="schemaVersion" />
+    <input type="hidden" name="businessKeyWord" id="businessKeyWord" />
+    <input type="hidden" name="tenderProjectCode" id="tenderProjectCode" />
+    <input type="hidden" name="businessId" id="businessId" />
+    <input type="hidden" name="businessObjectName" id="businessObjectName" />
+    <input type="hidden" name="transactionPlatfName" id="transactionPlatfName" />
+    <input type="hidden" name="platformCode" id="platformCode" />
+    <input type="hidden" name="oldBusinessId" id="oldBusinessId" />
+  </form>
+  <script src="http://www.cebpubservice.com/ctpsp_iiss/js/trade/des.js"></script>
+  <script>
+    (function () {
+      var rec = {{ rec|tojson }};
+
+      function currentTimeKey() {
+        var now = new Date();
+        var year = now.getFullYear();
+        var month = now.getMonth() + 1;
+        var day = now.getDate();
+        var hh = now.getHours();
+        var mm = now.getMinutes();
+        var ss = now.getSeconds();
+        if (ss > 30) {
+          if (mm === 59) {
+            hh = hh + 1;
+            mm = 0;
+          } else {
+            mm = mm + 1;
+          }
+        }
+        var clock = year + "-";
+        if (month < 10) clock += "0";
+        clock += month + "-";
+        if (day < 10) clock += "0";
+        clock += day + " ";
+        if (hh < 10) clock += "0";
+        clock += hh;
+        return clock;
+      }
+
+      function showError(text) {
+        document.getElementById("msg").textContent = text;
+        document.getElementById("fallback").style.display = "block";
+      }
+
+      if (typeof strEnc !== "function") {
+        showError("无法加载平台加密脚本，请检查网络后刷新重试。");
+        return;
+      }
+
+      var key1 = currentTimeKey();
+      var key2 = "cebpubservice";
+      var key3 = "iiss";
+
+      document.getElementById("schemaVersion").value = rec.schema_version || "";
+      document.getElementById("businessKeyWord").value = rec.business_keyword || "tenderBulletin";
+      document.getElementById("tenderProjectCode").value = strEnc(
+        rec.tender_project_code || "", key1, key2, key3
+      );
+      document.getElementById("businessId").value = strEnc(
+        rec.business_id || "", key1, key2, key3
+      );
+      document.getElementById("businessObjectName").value = rec.title || "";
+      document.getElementById("transactionPlatfName").value = rec.platform || "";
+      document.getElementById("platformCode").value = rec.transaction_platf_code || "";
+      document.getElementById("oldBusinessId").value = rec.business_id || "";
+
+      var form = document.getElementById("detailForm");
+      document.getElementById("manual").onclick = function (e) {
+        e.preventDefault();
+        form.submit();
+      };
+      form.submit();
+      setTimeout(function () {
+        document.getElementById("fallback").style.display = "block";
+      }, 2500);
+    })();
+  </script>
+  {% endif %}
+</body>
+</html>
