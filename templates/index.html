@@ -288,12 +288,23 @@
     .status-ok { color: var(--success); }
     .status-fail { color: var(--error); }
     .status-empty { color: #f59e0b; }
+    .version-badge {
+      display: inline-block;
+      margin-left: 0.5rem;
+      padding: 0.1rem 0.5rem;
+      font-size: 0.7rem;
+      font-weight: 500;
+      color: var(--muted);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      vertical-align: middle;
+    }
   </style>
 </head>
 <body>
   <div class="layout">
     <header>
-      <h1>TenderCrawler</h1>
+      <h1>TenderCrawler<span class="version-badge">v{{ version }}</span></h1>
       <p>支持 cebpub / ccgp 两站抓取、结果对比与招标时间解析</p>
     </header>
 

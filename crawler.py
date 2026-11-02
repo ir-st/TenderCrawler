@@ -8,6 +8,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
 import time
 from dataclasses import asdict
@@ -78,6 +79,15 @@ def parse_item(
     )
 
 
+class VerificationRequiredError(RuntimeError):
+    """平台要求人机验证（cebpub 已启用 VAPTCHA），当前会话无法继续查询。"""
+
+
+# 连续多少个「关键词 × 业务类型」组合被要求验证码后，提前结束整个抓取，
+# 避免在本机已被平台限制时继续请求。
+MAX_CONSECUTIVE_VERIFICATION_BLOCKS = 3
+
+
 class CebpubCrawler:
     def __init__(
         self,
@@ -90,15 +100,27 @@ class CebpubCrawler:
         self.site = site
         self.page_size = page_size
         self.delay_seconds = delay_seconds
+        self.timeout = timeout
+        self.session: requests.Session | None = None
+        self._warmed = False
+        self._reset_session()
+
+    def _reset_session(self) -> None:
+        """为新的「关键词 × 业务类型」组合建立全新会话。
+
+        平台规则：每个会话的首次查询免 VAPTCHA 验证，同会话的后续查询
+        （翻页、换关键词）均要求验证码。新会话可继续免验证获取该组合的
+        首页数据；若平台开始要求验证码或重置连接，crawl() 会跳过该组合
+        并在连续受阻时提前结束，保留已抓取结果。
+        """
         self.session = requests.Session()
         self.session.headers.update(
             {
                 "User-Agent": USER_AGENT,
-                "Referer": site.portal_url,
+                "Referer": self.site.portal_url,
                 "Accept": "application/json, text/javascript, */*; q=0.01",
             }
         )
-        self.timeout = timeout
         self._warmed = False
 
     def _warmup(self) -> None:
@@ -135,16 +157,36 @@ class CebpubCrawler:
             "pageNo": page_no,
             "row": self.page_size,
         }
-        self._warmup()
-        resp = self.session.post(
-            self.site.search_api, data=payload, timeout=self.timeout
-        )
-        resp.raise_for_status()
+        # 平台 / WAF 可能瞬时重置连接（表现为 SSLError / ConnectionError），
+        # 短暂退避后重试一次；仍失败则抛出带说明的 RuntimeError。
+        last_exc: Exception | None = None
+        for attempt in range(2):
+            try:
+                self._warmup()
+                resp = self.session.post(
+                    self.site.search_api, data=payload, timeout=self.timeout
+                )
+                resp.raise_for_status()
+                break
+            except (requests.SSLError, requests.ConnectionError) as exc:
+                last_exc = exc
+                self._warmed = False
+                time.sleep(3 * (attempt + 1))
+        else:
+            raise RuntimeError(
+                f"招标投标平台连接失败（本机可能已被临时限流，请稍后重试）: "
+                f"keyword={keyword!r} type={business_type!r} page={page_no}；{last_exc}"
+            )
         body = parse_json_response(
             resp, source="中国招标投标公共服务平台"
         )
         if not body.get("success"):
             msg = body.get("message") or "未知错误"
+            if "v-token" in msg or "验证码" in msg:
+                raise VerificationRequiredError(
+                    f"招标投标平台要求人机验证（VAPTCHA）: keyword={keyword!r} "
+                    f"type={business_type!r} page={page_no}；{msg}"
+                )
             raise RuntimeError(
                 f"招标投标平台查询失败: keyword={keyword!r} type={business_type!r} "
                 f"page={page_no}；{msg}（请确认业务类型与该站点匹配，如「招标公告」而非「全部」）"
@@ -211,39 +253,99 @@ class CebpubCrawler:
     ) -> list[TenderRecord]:
         seen: set[str] = set()
         records: list[TenderRecord] = []
+        blocked_combos: list[tuple[str, str]] = []
+        pagination_blocked_combos: list[tuple[str, str]] = []
+        consecutive_blocks = 0
+        pagination_blocked = False  # 一旦出现翻页被要求验证码，后续组合只抓首页
+        stopped_early = False
 
         for kw in keywords:
+            if stopped_early:
+                break
             for bt in business_types:
+                # 每个组合使用全新会话：平台仅免验证每个会话的首次查询，
+                # 同会话翻页/换词都会要求 VAPTCHA 验证码。
+                self._reset_session()
                 log(f"正在抓取: 关键词={kw!r} 类型={bt}")
-                for raw in self.fetch_all_for_query(
-                    keyword=kw,
-                    business_type=bt,
-                    date_start=date_start,
-                    date_stop=date_stop,
-                    max_pages=max_pages,
-                    on_progress=on_progress,
-                ):
-                    rec = parse_item(
-                        raw,
+                # 已确认翻页需要验证码时，不再为后续组合发起注定失败的翻页请求
+                combo_max_pages = 1 if (pagination_blocked and max_pages != 1) else max_pages
+                try:
+                    for raw in self.fetch_all_for_query(
+                        keyword=kw,
                         business_type=bt,
-                        search_keyword=kw,
-                        strict_filter=strict_filter,
-                        portal_url=self.site.portal_url,
-                        source_site=self.site.id,
+                        date_start=date_start,
+                        date_stop=date_stop,
+                        max_pages=combo_max_pages,
+                        on_progress=on_progress,
+                    ):
+                        rec = parse_item(
+                            raw,
+                            business_type=bt,
+                            search_keyword=kw,
+                            strict_filter=strict_filter,
+                            portal_url=self.site.portal_url,
+                            source_site=self.site.id,
+                        )
+                        if rec is None:
+                            continue
+                        if rec.dedupe_key in seen:
+                            continue
+                        seen.add(rec.dedupe_key)
+                        records.append(rec)
+                except VerificationRequiredError as exc:
+                    blocked_page = page_hint(exc)
+                    if blocked_page != "1":
+                        # 翻页（第 2 页起）被要求验证码是平台的结构性限制：
+                        # 保留该组合首页数据，后续组合直接只抓首页。
+                        pagination_blocked = True
+                        pagination_blocked_combos.append((kw, bt))
+                        log(
+                            f"平台要求人机验证，翻页受限，仅保留该组合首页数据: "
+                            f"关键词={kw!r} 类型={bt!r}（第 {blocked_page} 页起受限）"
+                        )
+                        time.sleep(self.delay_seconds)
+                        continue
+                    # 连首页都被要求验证码：说明本机很可能已被平台按 IP 限制
+                    blocked_combos.append((kw, bt))
+                    consecutive_blocks += 1
+                    log(
+                        f"平台要求人机验证，已跳过该组合: 关键词={kw!r} 类型={bt!r}"
                     )
-                    if rec is None:
-                        continue
-                    if rec.dedupe_key in seen:
-                        continue
-                    seen.add(rec.dedupe_key)
-                    records.append(rec)
+                    if consecutive_blocks >= MAX_CONSECUTIVE_VERIFICATION_BLOCKS:
+                        log(
+                            "连续多个组合的首页都被要求验证码，平台已开始限制本机访问，"
+                            "提前结束本次抓取并保留已抓结果。请减少关键词/业务类型数量、"
+                            "增大请求间隔或稍后再试。"
+                        )
+                        stopped_early = True
+                        break
+                    time.sleep(max(self.delay_seconds, 5.0))
+                    continue
+                consecutive_blocks = 0
                 time.sleep(self.delay_seconds)
+
+        if pagination_blocked_combos:
+            log(
+                f"提示: 平台对翻页查询启用了人机验证，以下 {len(pagination_blocked_combos)} 个"
+                f"组合仅抓取了首页（每页 {self.page_size} 条）"
+                + ("，后续组合已自动改为只抓首页。" if pagination_blocked else "。")
+            )
+        if blocked_combos:
+            preview = "、".join(f"{kw}/{bt}" for kw, bt in blocked_combos[:5])
+            more = f" 等 {len(blocked_combos)} 个" if len(blocked_combos) > 5 else ""
+            log(f"本次共有 {len(blocked_combos)} 个组合因平台验证码限制未抓取：{preview}{more}")
 
         records.sort(
             key=lambda r: (r.publish_time or "", r.title),
             reverse=True,
         )
         return records
+
+
+def page_hint(exc: VerificationRequiredError) -> str:
+    """从错误信息中取出受限页码，便于日志说明。"""
+    m = re.search(r"page=(\d+)", str(exc))
+    return m.group(1) if m else "?"
 
 
 def create_crawler(site_id: str, **kwargs):
@@ -355,10 +457,17 @@ def save_csv(records: list[TenderRecord], path: Path) -> None:
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
+    from version import __version__
+
     p = argparse.ArgumentParser(description="招投标信息抓取工具")
+    p.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     p.add_argument("--site", default="cebpub", help="目标站点 ID")
     p.add_argument("--keywords", nargs="+", default=DEFAULT_KEYWORDS)
-    p.add_argument("--types", nargs="+", choices=BUSINESS_TYPES, default=BUSINESS_TYPES)
+    # 不限定 choices：合法取值随 --site 变化（cebpub 四类 / ccgp 十类），
+    # 最终由 normalize_business_types 按站点校验并给出提示。
+    p.add_argument("--types", nargs="+", default=BUSINESS_TYPES,
+                   help="业务类型（cebpub: 招标公告/开标记录/评标公示/中标公告；"
+                        "ccgp: 全部/公开招标/询价公告/竞争性谈判/竞争性磋商/更正公告/中标公告 等）")
     p.add_argument("--date-start", default="")
     p.add_argument("--date-stop", default="")
     p.add_argument("--no-strict-filter", action="store_true")
@@ -371,6 +480,9 @@ def build_arg_parser() -> argparse.ArgumentParser:
 
 
 def main() -> int:
+    from version import __version__
+
+    print(f"TenderCrawler v{__version__}", file=sys.stderr)
     args = build_arg_parser().parse_args()
     try:
         records = run_crawl(

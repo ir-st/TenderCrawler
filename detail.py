@@ -3,11 +3,11 @@
 from __future__ import annotations
 
 CEBPUB_DETAIL_ACTION = (
-    "http://www.cebpubservice.com/ctpsp_iiss/"
+    "https://www.cebpubservice.com/ctpsp_iiss/"
     "searchbusinesstypebeforedooraction/showDetails.do"
 )
 CEBPUB_FRAME_DETAIL = (
-    "http://connect.cebpubservice.com/PSPFrame/infobasemis/socialpublic/"
+    "https://connect.cebpubservice.com/PSPFrame/infobasemis/socialpublic/"
     "publicyewu/Frame_yewuDetail?rowguid="
 )
 

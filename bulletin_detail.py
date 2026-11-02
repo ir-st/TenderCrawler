@@ -13,14 +13,14 @@ from bs4 import BeautifulSoup
 from detail import business_keyword_for
 
 CEBPUB_FIND_DETAIL = (
-    "http://www.cebpubservice.com/ctpsp_iiss/SecondaryAction/findDetail.do"
+    "https://www.cebpubservice.com/ctpsp_iiss/SecondaryAction/findDetail.do"
 )
 CEBPUB_PORTAL = (
-    "http://www.cebpubservice.com/ctpsp_iiss/"
+    "https://www.cebpubservice.com/ctpsp_iiss/"
     "searchbusinesstypebeforedooraction/getSearch.do"
 )
 CEBPUB_SHOW_DETAILS = (
-    "http://www.cebpubservice.com/ctpsp_iiss/"
+    "https://www.cebpubservice.com/ctpsp_iiss/"
     "searchbusinesstypebeforedooraction/showDetails.do"
 )
 

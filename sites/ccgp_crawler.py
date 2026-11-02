@@ -67,7 +67,7 @@ def _normalize_href(href: str) -> str:
         return ""
     if href.startswith("http"):
         return href
-    return urljoin("http://www.ccgp.gov.cn", href)
+    return urljoin("https://www.ccgp.gov.cn", href)
 
 
 def _parse_list_item(

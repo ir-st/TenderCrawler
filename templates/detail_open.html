@@ -37,6 +37,9 @@
     })();
   </script>
   {% else %}
+  {# 官网 showDetails.do 现流程：参数不再 DES 加密，直接明文 POST。
+     浏览器侧每次打开会先弹 VAPTCHA；服务端对每次 POST 均返回详情页框架，
+     正文由页面内 AJAX 加载。此处沿用明文 POST 中转。 #}
   <form id="detailForm" method="post" action="{{ detail_action }}" target="_blank" style="display:none">
     <input type="hidden" name="schemaVersion" id="schemaVersion" />
     <input type="hidden" name="businessKeyWord" id="businessKeyWord" />
@@ -47,63 +50,28 @@
     <input type="hidden" name="platformCode" id="platformCode" />
     <input type="hidden" name="oldBusinessId" id="oldBusinessId" />
   </form>
-  <script src="http://www.cebpubservice.com/ctpsp_iiss/js/trade/des.js"></script>
   <script>
     (function () {
       var rec = {{ rec|tojson }};
-
-      function currentTimeKey() {
-        var now = new Date();
-        var year = now.getFullYear();
-        var month = now.getMonth() + 1;
-        var day = now.getDate();
-        var hh = now.getHours();
-        var mm = now.getMinutes();
-        var ss = now.getSeconds();
-        if (ss > 30) {
-          if (mm === 59) {
-            hh = hh + 1;
-            mm = 0;
-          } else {
-            mm = mm + 1;
-          }
-        }
-        var clock = year + "-";
-        if (month < 10) clock += "0";
-        clock += month + "-";
-        if (day < 10) clock += "0";
-        clock += day + " ";
-        if (hh < 10) clock += "0";
-        clock += hh;
-        return clock;
-      }
 
       function showError(text) {
         document.getElementById("msg").textContent = text;
         document.getElementById("fallback").style.display = "block";
       }
 
-      if (typeof strEnc !== "function") {
-        showError("无法加载平台加密脚本，请检查网络后刷新重试。");
+      try {
+        document.getElementById("schemaVersion").value = rec.schema_version || "";
+        document.getElementById("businessKeyWord").value = rec.business_keyword || "tenderBulletin";
+        document.getElementById("tenderProjectCode").value = rec.tender_project_code || "";
+        document.getElementById("businessId").value = rec.business_id || "";
+        document.getElementById("businessObjectName").value = rec.title || "";
+        document.getElementById("transactionPlatfName").value = rec.platform || "";
+        document.getElementById("platformCode").value = rec.transaction_platf_code || "";
+        document.getElementById("oldBusinessId").value = rec.business_id || "";
+      } catch (e) {
+        showError("详情参数准备失败，请返回控制台重试。");
         return;
       }
-
-      var key1 = currentTimeKey();
-      var key2 = "cebpubservice";
-      var key3 = "iiss";
-
-      document.getElementById("schemaVersion").value = rec.schema_version || "";
-      document.getElementById("businessKeyWord").value = rec.business_keyword || "tenderBulletin";
-      document.getElementById("tenderProjectCode").value = strEnc(
-        rec.tender_project_code || "", key1, key2, key3
-      );
-      document.getElementById("businessId").value = strEnc(
-        rec.business_id || "", key1, key2, key3
-      );
-      document.getElementById("businessObjectName").value = rec.title || "";
-      document.getElementById("transactionPlatfName").value = rec.platform || "";
-      document.getElementById("platformCode").value = rec.transaction_platf_code || "";
-      document.getElementById("oldBusinessId").value = rec.business_id || "";
 
       var form = document.getElementById("detailForm");
       document.getElementById("manual").onclick = function (e) {

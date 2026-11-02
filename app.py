@@ -21,6 +21,8 @@ from detail import (
     CEBPUB_FRAME_DETAIL,
     business_keyword_for,
 )
+from version import __version__
+
 app = Flask(__name__)
 OUTPUT_DIR = Path("output")
 JOBS: dict[str, dict] = {}
@@ -59,6 +61,7 @@ def index():
             "index.html",
             suggested_keywords=all_kw,
             default_keywords=all_def,
+            version=__version__,
         )
     )
     resp.headers["Cache-Control"] = "no-store"
@@ -402,5 +405,5 @@ def api_download(job_id: str, fmt: str):
 
 if __name__ == "__main__":
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    print("TenderCrawler Web: http://127.0.0.1:5000")
+    print(f"TenderCrawler Web v{__version__}: http://127.0.0.1:5000")
     app.run(host="127.0.0.1", port=5000, debug=False)

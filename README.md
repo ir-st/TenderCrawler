@@ -1,6 +1,8 @@
 # TenderCrawler
 
-招投标信息抓取、对比与招标时间解析工具。支持 **Web 控制台**、**命令行** 与 **Windows 一键启动**（`start.bat`）。
+[![版本](https://img.shields.io/badge/version-1.0.0-blue)](version.py)
+
+招投标信息抓取、对比与招标时间解析工具。支持 **Web 控制台**、**命令行** 与 **Windows 一键启动**（`start.bat`）。当前版本 **v1.0.0**（版本号见 `version.py`，命令行可用 `python crawler.py --version` 查看）。
 
 当前内置两个站点：**中国招标投标公共服务平台**（`cebpub`）、**中国政府采购网**（`ccgp`）。可按关键词检索公告，导出 CSV/JSON，自动与上一次同站点结果对比，并解析招标公告中的文件获取时间与投标截止时间。
 
@@ -9,13 +11,16 @@
 | 项目 | `cebpub` | `ccgp` |
 |------|----------|--------|
 | 名称 | 中国招标投标公共服务平台 | 中国政府采购网 |
-| 门户 | [信息公开栏目](http://www.cebpubservice.com/ctpsp_iiss/searchbusinesstypebeforedooraction/getSearch.do) | [bxsearch](https://search.ccgp.gov.cn/bxsearch) |
+| 门户 | [信息公开栏目](https://www.cebpubservice.com/ctpsp_iiss/searchbusinesstypebeforedooraction/getSearch.do) | [bxsearch](https://search.ccgp.gov.cn/bxsearch) |
 | 数据方式 | JSON API（`getStringMethod.do`） | HTML 列表解析 |
 | 业务类型 | 招标公告、开标记录、评标公示、中标公告 | 全部、公开招标、询价公告、竞争性谈判、竞争性磋商、更正公告、中标公告 |
 | 默认间隔 | 0.8 秒 | 3 秒（界面建议 ≥4 秒） |
-| 详情打开 | `/detail/open` 加密中转页 | 公告直链 |
+| 人机验证 | **VAPTCHA**：每会话仅首次查询免验证，翻页需验证码 | 频繁访问提示页 |
+| 详情打开 | `/detail/open` 中转页（明文 POST） | 公告直链 |
 | 招标时间解析 | `findDetail.do` 公告正文 | 详情页 HTML 正文 |
 | 列表字段 | 含公告发布时间、公告结束时间 | 含公告发布时间（结束时间视页面而定） |
+
+> **cebpub 验证码限制**：平台已对搜索接口启用 VAPTCHA 人机验证——每个会话只有首次查询免验证，同会话翻页、换关键词都会要求验证码。爬虫按「每个 关键词×业务类型 组合一个全新会话」获取各组合**首页**数据；翻页受限时自动保留首页结果并提示，连续多个组合首页都被要求验证码时提前结束并保留已抓结果。请控制关键词/业务类型数量与运行频率，避免被平台按 IP 限制。
 
 更多站点可在 `sites/registry.py` 注册扩展。
 
@@ -146,9 +151,10 @@ print(format_compare_report(result))
 
 **cebpub**
 
-1. 关键词 × 业务类型调用 `getStringMethod.do` 并翻页。
-2. 按 `businessId + businessType` 去重。
-3. 列表含 `receiveTime`（公告发布时间）、`bulletinEndTime`（公告结束时间）。
+1. 每个「关键词 × 业务类型」组合使用独立会话调用 `getStringMethod.do`（平台每会话仅首次查询免 VAPTCHA 验证，全程使用 https——http 会被 301 重定向且 POST 被降级为 GET）。
+2. 翻页被要求验证码时保留该组合首页数据并提示；确认翻页受限后后续组合自动只抓首页；连续多个组合首页即被要求验证码时提前结束，保留已抓结果。
+3. 按 `businessId + businessType` 去重。
+4. 列表含 `receiveTime`（公告发布时间）、`bulletinEndTime`（公告结束时间）。
 
 **ccgp**
 
@@ -210,3 +216,16 @@ python openclaw/tender-crawler/scripts/run_daily_crawl.py
 ```
 
 定时任务依次抓取 **cebpub + ccgp**，输出 `cron_{站点}_{时间}.csv/json` 及对比报告。详见技能内 `SKILL.md`。
+
+## 版本记录
+
+版本号定义见 `version.py`（语义化版本），命令行 `python crawler.py --version` 查看当前版本。
+
+### v1.0.0（2026-11-02）
+
+- 修复：cebpub 全站迁移 HTTPS 导致搜索接口返回 `success:false`（http 301 重定向使 POST 被降级为 GET、请求参数丢失），全部接口地址改为 `https://`。
+- 适配：cebpub 搜索接口启用 VAPTCHA 人机验证（每会话仅首次查询免验证）——爬虫按「每个 关键词×业务类型 组合一个全新会话」抓取各组合首页；翻页被要求验证码时保留首页数据并提示，连续多个组合首页受阻时提前结束并保留已抓结果。
+- 修复：cebpub 详情页 `showDetails.do` 新流程不再使用 DES 加密参数（官网已注释加密并改为明文 + VAPTCHA），中转页同步改为明文 POST，解决详情页显示「暂无详细数据」的问题。
+- 修复：CLI `--types` 限定 cebpub 业务类型导致 `--site ccgp` 时合法参数被拒，改为按站点动态校验。
+- 改进：`http_utils` 增加「POST 被重定向降级为 GET」的诊断提示；cebpub 请求遇连接重置自动退避重试。
+- 新增：版本号体系（`version.py`），CLI `--version`、Web 控制台页头与启动日志展示版本。

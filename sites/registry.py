@@ -35,7 +35,9 @@ SHARED_KEYWORDS = (
 )
 
 
-CEBPUB_BASE = "http://www.cebpubservice.com/ctpsp_iiss"
+# 注意：必须使用 https。站点已将 http 301 重定向到 https，
+# requests 跟随 301 时会把 POST 降级为 GET，导致查询参数丢失、返回 success:false。
+CEBPUB_BASE = "https://www.cebpubservice.com/ctpsp_iiss"
 
 SITES: dict[str, SiteConfig] = {
     "cebpub": SiteConfig(

@@ -45,9 +45,27 @@ function Wait-Exit {
     Read-Host "Press Enter to exit"
 }
 
+function Get-AppVersion {
+    # 从 version.py 动态读取版本号，避免发版时漏改启动脚本
+    $versionFile = Join-Path (Get-Location) "version.py"
+    if (Test-Path $versionFile) {
+        $line = Get-Content $versionFile -ErrorAction SilentlyContinue |
+            Where-Object { $_ -match '__version__' } | Select-Object -First 1
+        if ($line -and $line -match '__version__\s*=\s*"([^"]+)"') {
+            return $Matches[1]
+        }
+    }
+    return $null
+}
+
 try {
+    $appVersion = Get-AppVersion
+    $bannerTitle = "  TenderCrawler Web Console"
+    if ($appVersion) {
+        $bannerTitle += " v" + $appVersion
+    }
     Write-Host "========================================"
-    Write-Host "  TenderCrawler Web Console"
+    Write-Host $bannerTitle
     Write-Host "========================================"
     Write-Host ""
     Write-Host "Sites: cebpub | ccgp (ccgp delay >= 4s recommended)"
